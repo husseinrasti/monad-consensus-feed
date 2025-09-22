@@ -43,9 +43,14 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
   }, []);
 
   // Most recent blocks by number (we show falling for all recent; verified limit handled separately)
-  const recentBlockNumbers = useMemo(() => (
-    Array.from(blocks.keys()).sort((a, b) => Number(b - a)).slice(0, 200)
-  ), [blocks]);
+  const recentBlockNumbers = useMemo(() => {
+    const blockNumbers = Array.from(blocks.keys());
+    return blockNumbers.sort((a, b) => {
+      const aNum = Number(a);
+      const bNum = Number(b);
+      return bNum - aNum;
+    }).slice(0, 200);
+  }, [blocks]);
 
   // Track per-block current visual row (for smooth transitions)
   const [rowPositions, setRowPositions] = useState<Map<string, CommitIndex>>(new Map());
@@ -268,7 +273,8 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
   const getColIndex = (key: string): number => {
     try {
       const n = BigInt(key);
-      const mod = Number(n % BigInt(Math.max(1, numCols)));
+      const maxCols = Math.max(1, numCols);
+      const mod = Number(n % BigInt(maxCols));
       return mod;
     } catch {
       return 0;

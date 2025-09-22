@@ -14,7 +14,8 @@ const HomePage: React.FC = () => {
   // Compute the latest (highest) block number from received blocks
   const latestBlockNumber = React.useMemo(() => {
     if (blocks.size === 0) return 0;
-    return Math.max(...Array.from(blocks.keys()).map(bn => Number(bn)));
+    const blockNumbers = Array.from(blocks.keys()).map(bn => Number(bn));
+    return Math.max(...blockNumbers);
   }, [blocks]);
 
   const handleBlockStatsUpdate = useCallback((stats: BlockStats) => {

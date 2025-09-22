@@ -11,6 +11,11 @@ export const config = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Temporary workaround for BigInt build issue
+  if (req.method !== 'GET') {
+    res.status(405).end();
+    return;
+  }
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache, no-transform')
@@ -60,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       (stats) => {
         // Convert bigint to string for SSE
         sendEvent('blockStats', {
-          blockNumber: stats.blockNumber?.toString(),
+          blockNumber: stats.blockNumber ? stats.blockNumber.toString() : null,
           blockId: stats.blockId ?? null,
           commitState: stats.commitState ?? null,
         })
