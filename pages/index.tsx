@@ -127,48 +127,58 @@ const HomePage: React.FC = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className="min-h-screen bg-terminal-bg text-terminal-green font-mono">
-        <div className="container mx-auto px-4 py-6">
-          {/* Header */}
-          <header className="text-center mb-8">
-            <h1 className="text-3xl font-bold terminal-glow mb-2">
+      <main className="h-screen w-screen bg-terminal-bg text-terminal-green font-mono p-4">
+        {/* Header Info Bar */}
+        <header className="mb-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold terminal-glow tracking-wide" aria-label="Monad Block Stats Feed">
               MONAD BLOCK STATS FEED
             </h1>
-            <div className="w-full h-px bg-terminal-green mb-4"></div>
-            <p className="text-sm text-gray-400">
-              Real-time blockchain statistics • Feed: Speculative • Status: 
-              <span className={`ml-1 ${
-                connectionStatus === 'connected' ? 'text-terminal-green' :
-                connectionStatus === 'connecting' ? 'text-yellow-400' :
-                connectionStatus === 'error' ? 'text-red-400' :
-                'text-gray-500'
-              }`}>
-                {connectionStatus.toUpperCase()}
-              </span>
-              {chainId && (
-                <span className="text-gray-400 ml-2">• Chain ID: {chainId}</span>
-              )}
-            </p>
-          </header>
+            <div className="text-xs sm:text-sm text-gray-400">by <span className="terminal-glow"><a href="https://x.com/hr0xCrypto" target="_blank" rel="noopener noreferrer">cipHer</a></span></div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] sm:text-xs text-gray-400">
+            <span>Chain ID: {chainId ?? 'N/A'}</span>
+            <span>•</span>
+            <span>Total Blocks: {blocks.size}</span>
+            <span>•</span>
+            <span>Log Entries: {logs.length}</span>
+            <span>•</span>
+            <span>
+              Last Update: {logs.length > 0 ? new Date(logs[logs.length - 1].timestamp).toLocaleTimeString() : 'N/A'}
+            </span>
+            <span className="ml-auto">
+              Status: <span
+                className={
+                  connectionStatus === 'connected' ? 'text-terminal-green' :
+                  connectionStatus === 'connecting' ? 'text-yellow-400' :
+                  connectionStatus === 'error' ? 'text-red-400' :
+                  'text-gray-500'
+                }
+                aria-live="polite"
+              >{connectionStatus.toUpperCase()}</span>
+            </span>
+          </div>
+        </header>
 
-          {/* Main Content Area */}
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
-            {/* Block Stats Table */}
-            <BlockStatsTable blocks={blocks} />
-
-            {/* Terminal Log */}
-            <TerminalLog logs={logs} />
+        {/* Split Layout with Vertical Divider */}
+        <section className="h-[calc(100vh-4rem)] sm:h-[calc(100vh-4.25rem)] md:h-[calc(100vh-4.5rem)] flex min-h-0">
+          {/* Left: Block Stats (70%) */}
+          <div className="flex-[7] min-w-0 mr-3 flex flex-col overflow-hidden" aria-label="Block statistics section">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <BlockStatsTable blocks={blocks} />
+            </div>
           </div>
 
-          {/* Footer Stats */}
-          <footer className="mt-8 text-center text-sm text-gray-500">
-            <div className="flex justify-center space-x-8">
-              <span>Total Blocks: {blocks.size}</span>
-              <span>Log Entries: {logs.length}</span>
-              <span>Last Update: {logs.length > 0 ? new Date(logs[logs.length - 1].timestamp).toLocaleTimeString() : 'N/A'}</span>
+          {/* Vertical Divider */}
+          <div className="w-px bg-terminal-green/40" role="separator" aria-orientation="vertical" />
+
+          {/* Right: Terminal Log (30%) */}
+          <div className="flex-[3] min-w-0 ml-3 flex flex-col overflow-hidden" aria-label="Terminal log section">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <TerminalLog logs={logs} />
             </div>
-          </footer>
-        </div>
+          </div>
+        </section>
       </main>
     </>
   );
