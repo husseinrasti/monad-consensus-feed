@@ -97,6 +97,31 @@ The dashboard tracks four commit states for each block:
 - Block table shows the most recent 100 blocks
 - Auto-scroll can be disabled by manually scrolling up in the log view
 
+## Deployment
+
+### Vercel Deployment
+
+This project is optimized for Vercel deployment. See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
+
+**Quick Deploy:**
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Set environment variables in Vercel dashboard:
+   - `NEXT_PUBLIC_RPC_URL=wss://your-monad-testnet-rpc-url`
+4. Deploy!
+
+**Using the deployment script:**
+```bash
+./scripts/deploy.sh
+```
+
+### Environment Variables
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `NEXT_PUBLIC_RPC_URL` | Monad WebSocket RPC endpoint | Yes | `wss://monad-testnet-rpc.example.com` |
+| `MONOPULSE_LOG_LEVEL` | Logging level for MonoPulse SDK | No | `info` |
+
 ## License
 
 MIT License - see LICENSE file for details.
