@@ -11,6 +11,12 @@ const HomePage: React.FC = () => {
   const [chainId, setChainId] = useState<number | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // Compute the latest (highest) block number from received blocks
+  const latestBlockNumber = React.useMemo(() => {
+    if (blocks.size === 0) return 0;
+    return Math.max(...Array.from(blocks.keys()).map(bn => Number(bn)));
+  }, [blocks]);
+
   const handleBlockStatsUpdate = useCallback((stats: BlockStats) => {
     const { blockNumber, commitState, blockId } = stats;
 
@@ -131,31 +137,18 @@ const HomePage: React.FC = () => {
         {/* Header Info Bar */}
         <header className="mb-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold terminal-glow tracking-wide" aria-label="Monad Block Stats Feed">
-              MONAD BLOCK STATS FEED
+            <h1 className="text-xl sm:text-2xl md:text-3xl terminal-glow tracking-wide" aria-label="MONAD CONSENSUS FEED">
+              MONAD CONSENSUS FEED
             </h1>
-            <div className="text-xs sm:text-sm text-gray-400">by <span className="terminal-glow"><a href="https://x.com/hr0xCrypto" target="_blank" rel="noopener noreferrer">cipHer</a></span></div>
+            <div className="text-xs sm:text-sm text-gray-400">by <span className="monospace text-xl"><a href="https://x.com/hr0xCrypto" target="_blank" rel="noopener noreferrer">cipHer</a></span></div>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] sm:text-xs text-gray-400">
-            <span>Chain ID: {chainId ?? 'N/A'}</span>
-            <span>•</span>
-            <span>Total Blocks: {blocks.size}</span>
+            <span>Latest Block Number: {latestBlockNumber}</span>
             <span>•</span>
             <span>Log Entries: {logs.length}</span>
             <span>•</span>
             <span>
               Last Update: {logs.length > 0 ? new Date(logs[logs.length - 1].timestamp).toLocaleTimeString() : 'N/A'}
-            </span>
-            <span className="ml-auto">
-              Status: <span
-                className={
-                  connectionStatus === 'connected' ? 'text-terminal-green' :
-                  connectionStatus === 'connecting' ? 'text-yellow-400' :
-                  connectionStatus === 'error' ? 'text-red-400' :
-                  'text-gray-500'
-                }
-                aria-live="polite"
-              >{connectionStatus.toUpperCase()}</span>
             </span>
           </div>
         </header>
