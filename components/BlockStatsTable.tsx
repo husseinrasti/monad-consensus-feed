@@ -79,6 +79,7 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
     const nextRowPositions = new Map(rowPositions);
     const nextVerifiedOrder = [...verifiedOrder];
     const updatedKeys: string[] = [];
+    const newlyVerifiedKeys: string[] = [];
 
     for (const bn of recentBlockNumbers) {
       const key = bn.toString();
@@ -121,35 +122,19 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
         // append to stacking order, drop overflow beyond 100
         nextVerifiedOrder.push(key);
         while (nextVerifiedOrder.length > 100) nextVerifiedOrder.shift();
+        // Track newly verified for batch processing
+        newlyVerifiedKeys.push(key);
         // ensure column lock exists for verified-only arrivals
         if (!assignedColRef.current.has(key)) {
           const chosen = getColIndex(key);
           assignedColRef.current.set(key, Math.max(0, Math.min(numCols - 1, chosen)));
         }
-        // mark just-verified freeze to avoid jump, reuse lastTop for a brief moment
-        try {
-          const now = performance.now ? performance.now() : Date.now();
-          justVerifiedUntilRef.current.set(key, now + 250);
-        } catch {
-          justVerifiedUntilRef.current.set(key, Date.now() + 250);
+        
+        // Initialize verified position based on last unverified position for smooth transition
+        const lastUnverifiedTop = lastTopRef.current.get(`${key}_unverified`);
+        if (lastUnverifiedTop !== undefined) {
+          lastTopRef.current.set(`${key}_verified`, lastUnverifiedTop);
         }
-        // bounce highlight
-        setRecentlyVerified(prev => {
-          const copy = new Set(prev);
-          copy.add(key);
-          return copy;
-        });
-        const existing = recentlyTimersRef.current.get(key);
-        if (existing) window.clearTimeout(existing);
-        const t = window.setTimeout(() => {
-          setRecentlyVerified(prev => {
-            const copy = new Set(prev);
-            copy.delete(key);
-            return copy;
-          });
-          recentlyTimersRef.current.delete(key);
-        }, 700);
-        recentlyTimersRef.current.set(key, t);
       }
     }
 
@@ -180,6 +165,42 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
     nextRowPositions.forEach((_, k) => {
       if (!recentSet.has(k)) nextRowPositions.delete(k);
     });
+
+    // Batch process newly verified blocks to prevent concurrent layout shifts
+    if (newlyVerifiedKeys.length > 0) {
+      // Use requestAnimationFrame to batch freeze/bounce updates
+      requestAnimationFrame(() => {
+        const now = performance.now ? performance.now() : Date.now();
+        
+        // Apply freeze and bounce effects to all newly verified blocks
+        newlyVerifiedKeys.forEach(key => {
+          // mark just-verified freeze to avoid jump, extend freeze window for concurrent events
+          justVerifiedUntilRef.current.set(key, now + 400);
+        });
+        
+        // Batch bounce highlight updates
+        setRecentlyVerified(prev => {
+          const copy = new Set(prev);
+          newlyVerifiedKeys.forEach(key => copy.add(key));
+          return copy;
+        });
+        
+        // Set up batch timer cleanup
+        newlyVerifiedKeys.forEach(key => {
+          const existing = recentlyTimersRef.current.get(key);
+          if (existing) window.clearTimeout(existing);
+          const t = window.setTimeout(() => {
+            setRecentlyVerified(prev => {
+              const copy = new Set(prev);
+              copy.delete(key);
+              return copy;
+            });
+            recentlyTimersRef.current.delete(key);
+          }, 700);
+          recentlyTimersRef.current.set(key, t);
+        });
+      });
+    }
 
     setRowPositions(nextRowPositions);
     setVerifiedOrder(nextVerifiedOrder);
@@ -373,9 +394,14 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
                     const until = justVerifiedUntilRef.current.get(key);
                     const now = performance.now ? performance.now() : Date.now();
                     if (until && now < until) {
-                      topPx = lastTopRef.current.get(key) ?? baseTop;
+                      // During freeze window, use the last verified position if available,
+                      // otherwise fall back to baseTop to prevent jump from unverified position
+                      const lastVerifiedTop = lastTopRef.current.get(`${key}_verified`);
+                      topPx = lastVerifiedTop ?? baseTop;
                     } else {
                       topPx = baseTop;
+                      // Store the current verified position for potential future freeze windows
+                      lastTopRef.current.set(`${key}_verified`, baseTop);
                     }
                   } else {
                     const idx = (item as any).idx as CommitIndex;
@@ -383,15 +409,24 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
                     // For idx===3 (shouldn't happen while unverified), snap to free so if it flips to verified, no jump
                     const effectiveFrac = idx === 3 ? 1 : frac;
                     topPx = Math.round(free * Math.min(effectiveFrac, 1));
-                    // remember last top for potential verified flip
-                    lastTopRef.current.set(key, topPx);
+                    // Store unverified position separately for smooth verified transition
+                    lastTopRef.current.set(`${key}_unverified`, topPx);
                   }
                   const isBouncing = isVerified && recentlyVerified.has(key);
                   return (
                     <div
                       key={key}
-                      className={`absolute left-1/2 -translate-x-1/2 transition-all duration-700 ease-out ${isHighlighted ? 'animate-pulse' : ''} ${isBouncing ? 'animate-bounce' : ''}`}
-                      style={{ top: `${topPx}px` }}
+                      className={`absolute left-1/2 transition-transform duration-700 ease-out ${isHighlighted ? 'animate-pulse' : ''}`}
+                      style={{ 
+                        top: 0,
+                        transform: `translateX(-50%) translateY(${topPx}px)`,
+                        willChange: 'transform',
+                        // Add small bounce effect via transform for verified blocks
+                        '--bounce-y': `${topPx}px`,
+                        ...(isBouncing && {
+                          animation: 'bounce 0.7s ease-in-out'
+                        })
+                      } as React.CSSProperties}
                     >
                       <button
                         className={`px-3 min-w-[10ch] sm:min-w-[11ch] md:min-w-[12ch] h-7 md:h-8 border rounded-sm flex items-center justify-center font-mono text-xs md:text-sm ${glow} transition-colors duration-500`}
