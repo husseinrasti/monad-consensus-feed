@@ -3,14 +3,13 @@ import Head from 'next/head';
 import BlockStatsTable from '@/components/BlockStatsTable';
 import TerminalLog from '@/components/TerminalLog';
 import { BlockState, LogEntry, BlockStats } from '@/types/blockStats';
-import { MonoPulseClient } from '@/lib/monoPulseClient';
 
 const HomePage: React.FC = () => {
   const [blocks, setBlocks] = useState<Map<bigint, BlockState>>(new Map());
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('disconnected');
   const [chainId, setChainId] = useState<number | null>(null);
-  const monoPulseClientRef = useRef<MonoPulseClient | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const handleBlockStatsUpdate = useCallback((stats: BlockStats) => {
     const { blockNumber, commitState, blockId } = stats;
@@ -61,63 +60,59 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    setConnectionStatus('connecting');
 
-    const initializeMonoPulse = async () => {
+    const es = new EventSource('/api/stream');
+    eventSourceRef.current = es;
+
+    es.addEventListener('meta', (evt: MessageEvent) => {
       try {
-        setConnectionStatus('connecting');
-        
-        // Initialize MonoPulse client
-        const client = new MonoPulseClient({
-          logLevel: 'info',
-        });
-        
-        monoPulseClientRef.current = client;
-
-        // Get chain ID for display
-        try {
-          const id = await client.getChainId();
-          if (isMounted) {
-            setChainId(id);
-          }
-        } catch (error) {
-          console.warn('Could not get chain ID:', error);
+        const data = JSON.parse(evt.data);
+        if (isMounted && typeof data.chainId === 'number') {
+          setChainId(data.chainId);
         }
-
-        // Start watching block stats
-        await client.startWatchingBlockStats(
-          handleBlockStatsUpdate,
-          handleError
-        );
-
-        if (isMounted) {
-          setConnectionStatus('connected');
-          
-          // Add initial log
-          const initLog: LogEntry = {
-            id: `init-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            blockNumber: BigInt(0),
-            state: 'SYSTEM',
-            message: 'Connected to Monad network via MonoPulse SDK',
-          };
-          setLogs(prevLogs => [...prevLogs, initLog]);
-        }
-      } catch (error) {
-        console.error('Failed to initialize MonoPulse:', error);
-        if (isMounted) {
-          handleError(error as Error);
-        }
+      } catch {
+        // ignore
       }
-    };
+    });
 
-    initializeMonoPulse();
+    es.addEventListener('blockStats', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data) as { blockNumber?: string; blockId?: string | null; commitState?: BlockStats['commitState'] };
+        const bn = data.blockNumber ? BigInt(data.blockNumber) : undefined;
+        if (bn && data.commitState) {
+          handleBlockStatsUpdate({
+            blockNumber: bn,
+            blockId: data.blockId ?? null,
+            commitState: data.commitState ?? null,
+          });
+        }
+        if (isMounted) setConnectionStatus('connected');
+      } catch (error) {
+        handleError(error as Error);
+      }
+    });
+
+    es.addEventListener('error', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse((evt as any).data || '{}');
+        handleError(new Error(data.message || 'SSE error'));
+      } catch {
+        handleError(new Error('SSE error'));
+      }
+    });
+
+    es.onerror = () => {
+      if (!isMounted) return;
+      setConnectionStatus('error');
+    };
 
     // Cleanup on unmount
     return () => {
       isMounted = false;
-      if (monoPulseClientRef.current) {
-        monoPulseClientRef.current.stopWatching();
-        monoPulseClientRef.current = null;
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
       setConnectionStatus('disconnected');
     };
