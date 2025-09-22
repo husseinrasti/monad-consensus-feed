@@ -2,13 +2,13 @@ import React from 'react';
 import { BlockState } from '@/types/blockStats';
 
 interface BlockStatsTableProps {
-  blocks: Map<number, BlockState>;
+  blocks: Map<bigint, BlockState>;
 }
 
 const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
   // Get the last 100 blocks, sorted by block number (descending)
   const sortedBlocks = Array.from(blocks.entries())
-    .sort(([a], [b]) => b - a)
+    .sort(([a], [b]) => Number(b - a))
     .slice(0, 100);
 
   const renderCheckmark = (value?: boolean): string => {
@@ -48,7 +48,7 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
                     className="border-b border-gray-700 hover:bg-gray-800 transition-colors"
                   >
                     <td className="p-2 text-terminal-green font-bold">
-                      #{blockNumber}
+                      #{blockNumber.toString()}
                     </td>
                     <td className="text-center p-2">
                       <span className={`${state.Proposed ? 'text-terminal-green' : 'text-gray-600'}`}>

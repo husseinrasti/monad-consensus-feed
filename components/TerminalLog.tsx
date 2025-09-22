@@ -49,7 +49,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ logs }) => {
                 <div key={log.id} className="mb-1">
                   <span className="text-gray-400">[{formatTimestamp(log.timestamp)}]</span>
                   <span className="text-terminal-green ml-2 terminal-glow">
-                    #{log.blockNumber} {log.message}
+                    #{log.blockNumber.toString()} {log.message}
                   </span>
                 </div>
               ))}
