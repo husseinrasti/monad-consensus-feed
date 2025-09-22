@@ -48,7 +48,9 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
     return blockNumbers.sort((a, b) => {
       const aNum = Number(a);
       const bNum = Number(b);
-      return bNum - aNum;
+      if (aNum < bNum) return 1;
+      if (aNum > bNum) return -1;
+      return 0;
     }).slice(0, 200);
   }, [blocks]);
 

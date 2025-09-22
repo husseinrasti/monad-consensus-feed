@@ -1,5 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { MonoPulse } from 'monopulse'
+
+// Dynamic import to avoid build-time BigInt issues
+let MonoPulse: any = null;
+try {
+  MonoPulse = require('monopulse').MonoPulse;
+} catch (error) {
+  console.warn('MonoPulse import failed:', error);
+}
 
 type WatcherStopFn = () => void
 
@@ -31,12 +38,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let stopWatcher: WatcherStopFn | undefined
   let heartbeat: NodeJS.Timeout | undefined
 
-  const mono = new MonoPulse({
-    provider: 'ws',
-    rpcUrl,
-    logger: { level: (process.env.MONOPULSE_LOG_LEVEL as any) || 'info' },
-  })
-
   const sendEvent = (event: string, data: unknown) => {
     try {
       res.write(`event: ${event}\n`)
@@ -46,7 +47,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // Check if MonoPulse is available
+  if (!MonoPulse) {
+    sendEvent('error', { message: 'MonoPulse library not available' })
+    res.end()
+    return
+  }
+
   try {
+    const mono = new MonoPulse({
+      provider: 'ws',
+      rpcUrl,
+      logger: { level: (process.env.MONOPULSE_LOG_LEVEL as any) || 'info' },
+    })
+
     // Send meta (chainId) once
     try {
       const chainId = await mono.getChainId()
@@ -57,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Start streaming block stats (speculative feed)
     stopWatcher = await mono.watchBlockStats(
-      (stats) => {
+      (stats: any) => {
         // Convert bigint to string for SSE
         sendEvent('blockStats', {
           blockNumber: stats.blockNumber ? stats.blockNumber.toString() : null,
