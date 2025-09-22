@@ -1,31 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { MonoPulse } from 'monopulse'
 
 type WatcherStopFn = () => void
-
-// Dynamic import function to avoid build-time BigInt issues
-async function loadMonoPulse() {
-  try {
-    console.log('Attempting to load MonoPulse package (ES Module)...')
-    
-    // MonoPulse is an ES module, so we need to use dynamic import
-    const monopulseModule = await import('monopulse');
-    console.log('MonoPulse module loaded, available exports:', Object.keys(monopulseModule));
-    
-    const { MonoPulse } = monopulseModule;
-    
-    if (typeof MonoPulse === 'function') {
-      console.log('MonoPulse class loaded successfully via ES import');
-      return MonoPulse;
-    } else {
-      console.error('MonoPulse is not a constructor function:', typeof MonoPulse);
-      console.error('Available in module:', monopulseModule);
-      return null;
-    }
-  } catch (error) {
-    console.error('Failed to load MonoPulse ES module:', error);
-    return null;
-  }
-}
 
 // Ensure this API route runs in Node (not edge)
 export const config = {
@@ -77,19 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // Load MonoPulse dynamically
-  console.log('Loading MonoPulse library...')
-  const MonoPulse = await loadMonoPulse()
-  
-  if (!MonoPulse) {
-    const errorMsg = 'MonoPulse library not available. Please check the monopulse package installation.'
-    console.error(errorMsg)
-    sendEvent('error', { message: errorMsg })
-    res.end()
-    return
-  }
-  
-  console.log('MonoPulse library loaded successfully')
+  console.log('MonoPulse library imported successfully')
 
   // Force polling mode in serverless environments like Vercel
   const forcePolling = process.env.VERCEL === '1' || process.env.FORCE_POLLING === 'true'
