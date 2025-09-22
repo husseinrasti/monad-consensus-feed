@@ -3,10 +3,6 @@ const nextConfig = {
   reactStrictMode: true,
   // Ensure proper handling of API routes and BigInt libraries
   serverExternalPackages: ['monopulse'],
-  // Disable build traces collection to avoid BigInt issues
-  generateBuildId: async () => {
-    return 'build-' + Date.now()
-  },
   // Experimental flag to handle ES modules better
   experimental: {
     esmExternals: 'loose',
@@ -18,6 +14,15 @@ const nextConfig = {
       config.externals = config.externals || []
       config.externals.push('monopulse')
     }
+    
+    // Handle BigInt serialization issues
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    }
+    
     return config
   },
 }
