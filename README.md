@@ -26,7 +26,7 @@ A real-time blockchain statistics dashboard for the Monad network, built with Ne
    
    Edit `.env.local` and set your Monad WebSocket RPC URL:
    ```env
-   RPC_URL=wss://your-monad-rpc-endpoint.com
+   NEXT_PUBLIC_RPC_URL=wss://your-monad-rpc-endpoint.com
    ```
 
 3. **Run Development Server**:
@@ -68,7 +68,8 @@ The dashboard tracks four commit states for each block:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `RPC_URL` | Monad WebSocket RPC endpoint | Yes |
+| `NEXT_PUBLIC_RPC_URL` | Monad WebSocket RPC endpoint (client-side) | Yes |
+| `RPC_URL` | Monad WebSocket RPC endpoint (server-side fallback) | No |
 | `MONOPULSE_LOG_LEVEL` | SDK log level (silent, error, warn, info, debug) | No |
 
 ## Development
@@ -87,7 +88,7 @@ The dashboard tracks four commit states for each block:
 ## Troubleshooting
 
 ### Connection Issues
-- Verify your `RPC_URL` is correct and accessible
+- Verify your `NEXT_PUBLIC_RPC_URL` is correct and accessible
 - Check network connectivity to the Monad endpoint
 - Monitor browser console for WebSocket connection errors
 

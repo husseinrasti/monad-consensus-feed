@@ -15,10 +15,13 @@ export class MonoPulseClient {
   private stopWatcher?: WatcherStopFn;
 
   constructor(options: MonoPulseClientOptions) {
-    const rpcUrl = options.rpcUrl || process.env.RPC_URL || process.env.WS_RPC_URL;
+    const rpcUrl = options.rpcUrl || 
+                   process.env.NEXT_PUBLIC_RPC_URL || 
+                   process.env.RPC_URL || 
+                   process.env.WS_RPC_URL;
     
     if (!rpcUrl) {
-      throw new Error('RPC_URL is required for MonoPulse connection. Please set it in your environment variables.');
+      throw new Error('RPC_URL is required for MonoPulse connection. Please set NEXT_PUBLIC_RPC_URL in your environment variables.');
     }
 
     this.monoPulse = new MonoPulse({
