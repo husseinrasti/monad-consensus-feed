@@ -19,12 +19,21 @@
 
 In the Vercel dashboard, go to your project settings and add these environment variables:
 
+**Required:**
 ```
-NEXT_PUBLIC_RPC_URL=wss://your-monad-testnet-rpc-url
-MONOPULSE_LOG_LEVEL=info
+RPC_URL=wss://your-monad-testnet-rpc-url
 ```
 
-**Important**: Replace `wss://your-monad-testnet-rpc-url` with your actual Monad testnet RPC WebSocket URL.
+**Optional:**
+```
+MONOPULSE_LOG_LEVEL=warn
+FORCE_POLLING=true
+```
+
+**Important Notes:**
+- Replace `wss://your-monad-testnet-rpc-url` with your actual Monad testnet RPC WebSocket URL
+- `FORCE_POLLING=true` is automatically set for Vercel deployments to ensure compatibility
+- The app will automatically fallback to HTTP polling if WebSocket connections fail
 
 ### 3. Build Configuration
 
@@ -45,8 +54,11 @@ The project is already configured for Vercel deployment with:
 
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
-| `NEXT_PUBLIC_RPC_URL` | Monad WebSocket RPC endpoint | Yes | `wss://monad-testnet-rpc.example.com` |
-| `MONOPULSE_LOG_LEVEL` | Logging level for MonoPulse SDK | No | `info` |
+| `RPC_URL` | Monad WebSocket RPC endpoint | Yes | `wss://monad-testnet-rpc.example.com` |
+| `MONOPULSE_LOG_LEVEL` | Logging level for MonoPulse SDK | No | `warn` |
+| `FORCE_POLLING` | Force HTTP polling instead of WebSocket | No | `true` |
+
+**Note**: Vercel automatically sets `VERCEL=1` and `FORCE_POLLING=true` for optimal compatibility.
 
 ## Features
 

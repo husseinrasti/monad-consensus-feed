@@ -107,7 +107,7 @@ This project is optimized for Vercel deployment. See [DEPLOYMENT.md](./DEPLOYMEN
 1. Push your code to GitHub
 2. Connect your repository to Vercel
 3. Set environment variables in Vercel dashboard:
-   - `NEXT_PUBLIC_RPC_URL=wss://your-monad-testnet-rpc-url`
+   - `RPC_URL=wss://your-monad-testnet-rpc-url`
 4. Deploy!
 
 **Using the deployment script:**
@@ -119,8 +119,9 @@ This project is optimized for Vercel deployment. See [DEPLOYMENT.md](./DEPLOYMEN
 
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
-| `NEXT_PUBLIC_RPC_URL` | Monad WebSocket RPC endpoint | Yes | `wss://monad-testnet-rpc.example.com` |
-| `MONOPULSE_LOG_LEVEL` | Logging level for MonoPulse SDK | No | `info` |
+| `RPC_URL` | Monad WebSocket RPC endpoint | Yes | `wss://monad-testnet-rpc.example.com` |
+| `MONOPULSE_LOG_LEVEL` | Logging level for MonoPulse SDK | No | `warn` |
+| `FORCE_POLLING` | Force HTTP polling instead of WebSocket | No | `true` |
 
 ## License
 

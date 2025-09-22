@@ -1,12 +1,16 @@
 {
   "functions": {
     "pages/api/stream.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   },
   "build": {
     "env": {
       "NODE_OPTIONS": "--max-old-space-size=4096"
     }
+  },
+  "env": {
+    "FORCE_POLLING": "true",
+    "MONOPULSE_LOG_LEVEL": "warn"
   }
 }
