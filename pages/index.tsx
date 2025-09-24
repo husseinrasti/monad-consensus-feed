@@ -135,10 +135,10 @@ const HomePage: React.FC = () => {
   return (
     <>
       <Head>
-        <title>Monad BlockStats Feed</title>
+        <title>MonadBFT Live</title>
         <meta name="description" content="Live Monad blockchain statistics dashboard" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/monad-logo.png" />
       </Head>
 
       <main className="h-screen w-screen bg-terminal-bg text-terminal-green font-mono p-4">
@@ -152,8 +152,6 @@ const HomePage: React.FC = () => {
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] sm:text-xs text-gray-400">
             <span>Latest Block Number: {latestBlockNumber}</span>
-            <span>•</span>
-            <span>Log Entries: {logs.length}</span>
             <span>•</span>
             <span>
               Last Update: {logs.length > 0 ? new Date(logs[logs.length - 1].timestamp).toLocaleTimeString() : 'N/A'}
