@@ -20,11 +20,11 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ logs }) => {
   };
 
   return (
-    <div className="w-full" aria-label="Terminal log">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-terminal-green font-mono text-sm sm:text-base font-bold terminal-glow">Terminal Log</h2>
+    <div className="w-full h-full flex flex-col" aria-label="Terminal log">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+        <h2 className="text-terminal-green font-mono text-xs sm:text-sm md:text-base font-bold terminal-glow">Terminal Log</h2>
       </div>
-      <div className="font-mono text-sm leading-relaxed space-y-1" aria-live="polite">
+      <div className="font-mono text-xs sm:text-sm leading-relaxed space-y-1 flex-1 overflow-y-auto" aria-live="polite">
         {newestFirst.length === 0 ? (
           <div className="text-gray-500">
             <span>Waiting for block updates...</span>

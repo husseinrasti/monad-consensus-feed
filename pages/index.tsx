@@ -141,38 +141,38 @@ const HomePage: React.FC = () => {
         <link rel="icon" href="/monad-logo.png" />
       </Head>
 
-      <main className="h-screen w-screen bg-terminal-bg text-terminal-green font-mono p-4">
+      <main className="h-screen w-screen bg-terminal-bg text-terminal-green font-mono p-2 md:p-4">
         {/* Header Info Bar */}
-        <header className="mb-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl sm:text-2xl md:text-3xl terminal-glow tracking-wide" aria-label="MONAD CONSENSUS FEED">
+        <header className="mb-2 md:mb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl terminal-glow tracking-wide" aria-label="MONAD CONSENSUS FEED">
               MONAD CONSENSUS FEED
             </h1>
-            <div className="text-xs sm:text-sm text-gray-400">by <span className="monospace text-xl"><a href="https://x.com/hr0xCrypto" target="_blank" rel="noopener noreferrer">cipHer</a></span></div>
+            <div className="text-xs sm:text-sm text-gray-400">by <span className="monospace text-sm sm:text-xl"><a href="https://x.com/hr0xCrypto" target="_blank" rel="noopener noreferrer">cipHer</a></span></div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] sm:text-xs text-gray-400">
-            <span>Latest Block Number: {latestBlockNumber}</span>
-            <span>•</span>
+          <div className="mt-1 md:mt-2 flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-1 text-[10px] sm:text-[11px] md:text-xs text-gray-400">
+            <span>Latest Block: {latestBlockNumber}</span>
+            <span className="hidden sm:inline">•</span>
             <span>
-              Last Update: {logs.length > 0 ? new Date(logs[logs.length - 1].timestamp).toLocaleTimeString() : 'N/A'}
+              Updated: {logs.length > 0 ? new Date(logs[logs.length - 1].timestamp).toLocaleTimeString() : 'N/A'}
             </span>
           </div>
         </header>
 
-        {/* Split Layout with Vertical Divider */}
-        <section className="h-[calc(100vh-4rem)] sm:h-[calc(100vh-4.25rem)] md:h-[calc(100vh-4.5rem)] flex min-h-0">
-          {/* Left: Block Stats (70%) */}
-          <div className="flex-[7] min-w-0 mr-3 flex flex-col overflow-hidden" aria-label="Block statistics section">
+        {/* Split Layout - Horizontal on Desktop, Vertical on Mobile */}
+        <section className="h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] md:h-[calc(100vh-4.5rem)] flex md:flex-row flex-col min-h-0">
+          {/* Block Stats Section - 70% height on mobile, 70% width on desktop */}
+          <div className="md:flex-[7] md:min-w-0 md:mr-3 flex-none h-[70%] md:h-auto flex flex-col overflow-hidden" aria-label="Block statistics section">
             <div className="flex-1 min-h-0 overflow-y-auto">
               <BlockStatsTable blocks={blocks} />
             </div>
           </div>
 
-          {/* Vertical Divider */}
-          <div className="w-px bg-terminal-green/40" role="separator" aria-orientation="vertical" />
+          {/* Divider - Horizontal on mobile, Vertical on desktop */}
+          <div className="md:w-px md:h-auto w-full h-px bg-terminal-green/40 md:my-0 my-2" role="separator" aria-orientation="vertical" />
 
-          {/* Right: Terminal Log (30%) */}
-          <div className="flex-[3] min-w-0 ml-3 flex flex-col overflow-hidden" aria-label="Terminal log section">
+          {/* Terminal Log Section - 30% height on mobile, 30% width on desktop */}
+          <div className="md:flex-[3] md:min-w-0 md:ml-3 flex-none h-[30%] md:h-auto flex flex-col overflow-hidden" aria-label="Terminal log section">
             <div className="flex-1 min-h-0 overflow-y-auto">
               <TerminalLog logs={logs} />
             </div>

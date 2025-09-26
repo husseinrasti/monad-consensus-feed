@@ -28,14 +28,32 @@ const indexToGlowClass = (idx: CommitIndex): string => (
 const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
   const BLOCK_STEP = 30; // px between stacked verified blocks
   const BLOCK_HEIGHT = 30; // approximate button height
-  // Responsive column count (4 / 6 / 8)
+  // Responsive column count with mobile-specific logic
   const [numCols, setNumCols] = useState<number>(6);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  
   useEffect(() => {
     const computeCols = () => {
       if (typeof window === 'undefined') return;
       const w = window.innerWidth;
-      const cols = w < 640 ? 4 : (w < 1024 ? 6 : 8);
-      setNumCols(cols);
+      const mobile = w <= 768; // Mobile breakpoint
+      setIsMobile(mobile);
+      
+      if (mobile) {
+        // Mobile: Calculate columns dynamically based on screen width
+        // Ensure each column can fit at least 4 blocks with proper spacing
+        const minBlockWidth = 80; // Minimum width for block including padding
+        const padding = 32; // Total horizontal padding
+        const gap = 12; // Gap between columns (3 * 4px)
+        const availableWidth = w - padding;
+        const maxCols = Math.floor((availableWidth + gap) / (minBlockWidth + gap));
+        const cols = Math.max(1, Math.min(maxCols, 6)); // At least 1, at most 6 columns
+        setNumCols(cols);
+      } else {
+        // Desktop: Original logic
+        const cols = w < 1024 ? 6 : 8;
+        setNumCols(cols);
+      }
     };
     computeCols();
     window.addEventListener('resize', computeCols);
@@ -292,12 +310,13 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
       const idx = Math.max(0, Math.min(numCols - 1, col));
       per[idx].push(k);
     });
-    // Enforce per-column cap of 10 by removing bottom-most (oldest)
+    // Enforce per-column cap: 5 on mobile, 10 on desktop
+    const maxPerColumn = isMobile ? 5 : 10;
     for (let i = 0; i < per.length; i++) {
-      if (per[i].length > 10) per[i] = per[i].slice(-10);
+      if (per[i].length > maxPerColumn) per[i] = per[i].slice(-maxPerColumn);
     }
     return per;
-  }, [verifiedStack, numCols]);
+  }, [verifiedStack, numCols, isMobile]);
 
   // Opacity gradient for older stacks
   const computeStackOpacity = (indexFromBottom: number, total: number): number => {
@@ -369,8 +388,11 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
       </div>
 
       <div className="h-[calc(100%-1.75rem)] w-full relative overflow-hidden">
-        {/* Columns grid */}
-        <div className={`absolute inset-0 grid ${numCols === 4 ? 'grid-cols-4' : (numCols === 6 ? 'grid-cols-6' : 'grid-cols-8')} gap-x-3`}>
+        {/* Columns grid - responsive gap and layout */}
+        <div 
+          className={`absolute inset-0 grid gap-x-2 md:gap-x-3`}
+          style={{ gridTemplateColumns: `repeat(${numCols}, 1fr)` }}
+        >
           {Array.from({ length: numCols }).map((_, colIndex) => (
             <div
               key={colIndex}
@@ -420,7 +442,6 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
                     // Store unverified position separately for smooth verified transition
                     lastTopRef.current.set(`${key}_unverified`, topPx);
                   }
-                  const isBouncing = isVerified && recentlyVerified.has(key);
                   return (
                     <div
                       key={key}
@@ -429,21 +450,17 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
                         top: 0,
                         transform: `translateX(-50%) translateY(${topPx}px)`,
                         willChange: 'transform',
-                        // Add small bounce effect via transform for verified blocks
                         '--bounce-y': `${topPx}px`,
-                        ...(isBouncing && {
-                          animation: 'bounce 0.7s ease-in-out'
-                        })
                       } as React.CSSProperties}
                     >
                       <button
-                        className={`px-3 min-w-[10ch] sm:min-w-[11ch] md:min-w-[12ch] h-7 md:h-8 border rounded-sm flex items-center justify-center font-mono text-xs md:text-sm ${glow} transition-colors duration-500`}
+                        className={`px-2 md:px-3 min-w-[8ch] sm:min-w-[10ch] md:min-w-[12ch] h-6 sm:h-7 md:h-8 border rounded-sm flex items-center justify-center font-mono text-[10px] sm:text-xs md:text-sm ${glow} transition-colors duration-500 overflow-hidden`}
                         tabIndex={0}
                         aria-label={`Block #${key}`}
                         onClick={() => handleClickOpen(key)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickOpen(key); } }}
                       >
-                        <span>#{key}</span>
+                        <span className="truncate">#{key}</span>
                       </button>
                     </div>
                   );

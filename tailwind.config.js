@@ -16,11 +16,18 @@ module.exports = {
       },
       animation: {
         'blink': 'blink 1s infinite',
+        'bounce': 'blockBounce 0.7s ease-in-out',
       },
       keyframes: {
         blink: {
           '0%, 50%': { opacity: '1' },
           '51%, 100%': { opacity: '0' },
+        },
+        blockBounce: {
+          '0%': { transform: 'translateX(-50%) translateY(var(--bounce-y)) scale(1)' },
+          '30%': { transform: 'translateX(-50%) translateY(calc(var(--bounce-y) - 10px)) scale(1.05)' },
+          '60%': { transform: 'translateX(-50%) translateY(calc(var(--bounce-y) + 5px)) scale(0.98)' },
+          '100%': { transform: 'translateX(-50%) translateY(var(--bounce-y)) scale(1)' },
         }
       }
     },
