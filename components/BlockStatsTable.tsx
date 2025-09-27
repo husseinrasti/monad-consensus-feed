@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { BlockState } from '@/types/blockStats';
 
 interface BlockStatsTableProps {
@@ -26,6 +27,7 @@ const indexToGlowClass = (idx: CommitIndex): string => (
 );
 
 const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
+  const router = useRouter();
   const BLOCK_STEP = 30; // px between stacked verified blocks
   const BLOCK_HEIGHT = 30; // approximate button height
   // Responsive column count with mobile-specific logic
@@ -338,9 +340,14 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
     return '75%';
   };
 
-  const handleClickOpen = (key: string) => {
-    const url = `https://testnet.monadexplorer.com/block/${key}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const handleClickOpen = (key: string, event: React.MouseEvent) => {
+    // Check if Ctrl/Cmd key is pressed for graph view
+    if (event.ctrlKey || event.metaKey) {
+      router.push(`/graph/${key}`);
+    } else {
+      const url = `https://testnet.monadexplorer.com/block/${key}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   // Build unverified per column using locked assignment
@@ -384,6 +391,9 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
         <div className="flex items-center gap-1">
           <span className="inline-block h-3 w-3 rounded-sm bg-emerald-600/50 shadow-[0_0_8px_#10b981] border border-emerald-400" />
           <span className="text-terminal-green/90">Verified</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1 ml-4 text-gray-400">
+          <span className="text-[10px]">💡 Ctrl+Click for Graph View</span>
         </div>
       </div>
 
@@ -456,9 +466,9 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
                       <button
                         className={`px-2 md:px-3 min-w-[8ch] sm:min-w-[10ch] md:min-w-[12ch] h-6 sm:h-7 md:h-8 border rounded-sm flex items-center justify-center font-mono text-[10px] sm:text-xs md:text-sm ${glow} transition-colors duration-500 overflow-hidden`}
                         tabIndex={0}
-                        aria-label={`Block #${key}`}
-                        onClick={() => handleClickOpen(key)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickOpen(key); } }}
+                        aria-label={`Block #${key} - Click to view on explorer, Ctrl+Click for graph view`}
+                        onClick={(e) => handleClickOpen(key, e)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickOpen(key, e as any); } }}
                       >
                         <span className="truncate">#{key}</span>
                       </button>

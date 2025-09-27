@@ -103,11 +103,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         stopWatcher = await mono.watchBlockStats(
           (stats: any) => {
             // Convert bigint to string for SSE
-            sendEvent('blockStats', {
+            const blockStatsData = {
               blockNumber: stats.blockNumber ? stats.blockNumber.toString() : null,
               blockId: stats.blockId ?? null,
               commitState: stats.commitState ?? null,
-            })
+              validators: stats.validators || null,
+            };
+            
+            sendEvent('blockStats', blockStatsData);
+            
+            // Also send block-specific validator event for graph view
+            if (stats.blockNumber && stats.validators) {
+              sendEvent('blockValidators', {
+                blockNumber: stats.blockNumber.toString(),
+                validators: stats.validators,
+                commitState: stats.commitState,
+                timestamp: new Date().toISOString(),
+              });
+            }
           },
           {
             feed: 'speculative',
@@ -141,6 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Polling fallback function
   function startPollingMode(monoInstance: any, eventSender: Function) {
     let lastBlockNumber = 0
+    const blockValidators = new Map<number, any[]>() // Store validators per block
     
     const poll = async () => {
       try {
@@ -154,13 +168,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const states = ['Proposed', 'Voted', 'Finalized', 'Verified']
           const randomState = states[Math.floor(Math.random() * states.length)]
           
-          eventSender('blockStats', {
+          // Generate mock validators for this block
+          const mockValidators = generateMockValidators(mockBlockNumber, randomState)
+          blockValidators.set(mockBlockNumber, mockValidators)
+          
+          const blockStatsData = {
             blockNumber: mockBlockNumber.toString(),
             blockId: null,
             commitState: randomState,
+            validators: mockValidators,
+          }
+          
+          eventSender('blockStats', blockStatsData)
+          
+          // Send block-specific validator event
+          eventSender('blockValidators', {
+            blockNumber: mockBlockNumber.toString(),
+            validators: mockValidators,
+            commitState: randomState,
+            timestamp: new Date().toISOString(),
           })
+          
           lastBlockNumber = mockBlockNumber
-          console.log(`Polling: Block ${mockBlockNumber} - ${randomState}`)
+          console.log(`Polling: Block ${mockBlockNumber} - ${randomState} - ${mockValidators.length} validators`)
         }
       } catch (error: any) {
         console.error('Polling error:', error)
@@ -170,6 +200,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Start polling every 3 seconds (slower for demo purposes)
     pollingInterval = setInterval(poll, 3000)
     console.log('Polling mode started (fallback for serverless)')
+  }
+
+  function generateMockValidators(blockNumber: number, commitState: string) {
+    const generateAddress = (role: string, index: number): string => {
+      const hash = (blockNumber + role.charCodeAt(0) + index * 7) % 0xFFFFFF
+      return `0x${hash.toString(16).padStart(6, '0')}...${(hash * 3).toString(16).slice(-4)}`
+    }
+
+    const validators = []
+    const now = new Date()
+
+    // Always include a proposer
+    validators.push({
+      id: `proposer-${blockNumber}`,
+      address: generateAddress('proposer', 1),
+      roles: ['Proposer'],
+      timestamp: now.toISOString(),
+      blockNumber: blockNumber.toString(),
+      commitState: 'Proposed',
+    })
+
+    // Add voters if state is Voted or beyond
+    if (['Voted', 'Finalized', 'Verified'].includes(commitState)) {
+      const voterCount = 3 + (blockNumber % 4)
+      for (let i = 0; i < voterCount; i++) {
+        validators.push({
+          id: `voter-${blockNumber}-${i}`,
+          address: generateAddress('voter', i + 1),
+          roles: ['Voter'],
+          timestamp: new Date(now.getTime() + 1000 + (i * 500)).toISOString(),
+          blockNumber: blockNumber.toString(),
+          commitState: 'Voted',
+        })
+      }
+    }
+
+    // Add finalizer if state is Finalized or Verified
+    if (['Finalized', 'Verified'].includes(commitState)) {
+      validators.push({
+        id: `finalizer-${blockNumber}`,
+        address: generateAddress('finalizer', 1),
+        roles: ['Finalizer'],
+        timestamp: new Date(now.getTime() + 5000).toISOString(),
+        blockNumber: blockNumber.toString(),
+        commitState: 'Finalized',
+      })
+    }
+
+    // Add verifiers if state is Verified
+    if (commitState === 'Verified') {
+      const verifierCount = 2 + (blockNumber % 3)
+      for (let i = 0; i < verifierCount; i++) {
+        validators.push({
+          id: `verifier-${blockNumber}-${i}`,
+          address: generateAddress('verifier', i + 1),
+          roles: ['Verifier'],
+          timestamp: new Date(now.getTime() + 8000 + (i * 300)).toISOString(),
+          blockNumber: blockNumber.toString(),
+          commitState: 'Verified',
+        })
+      }
+    }
+
+    return validators
   }
 
   // Cleanup on client disconnect
