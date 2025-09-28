@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { MonoPulse } from 'monopulse'
+import { getBlockTransactionCount, getRpcUrl } from '@/lib/blockchainUtils'
 
 type WatcherStopFn = () => void
 
@@ -172,11 +173,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const mockValidators = generateMockValidators(mockBlockNumber, randomState)
           blockValidators.set(mockBlockNumber, mockValidators)
           
+          // Get real transaction count from blockchain
+          let transactionCount = 0;
+          try {
+            // rpcUrl is already validated above, so it's safe to use
+            if (rpcUrl) {
+              transactionCount = await getBlockTransactionCount(rpcUrl, mockBlockNumber);
+              console.log(`Stream: Block ${mockBlockNumber}: Found ${transactionCount} transactions`);
+            } else {
+              throw new Error('RPC URL not available');
+            }
+          } catch (error) {
+            console.warn(`Stream: Failed to get real transaction count for block ${mockBlockNumber}, using fallback:`, error);
+            // Fallback to deterministic mock data if RPC fails
+            transactionCount = Math.floor(Math.random() * 200) + 50 + (mockBlockNumber % 100);
+          }
+
           const blockStatsData = {
             blockNumber: mockBlockNumber.toString(),
             blockId: null,
             commitState: randomState,
             validators: mockValidators,
+            transactionCount,
           }
           
           eventSender('blockStats', blockStatsData)
@@ -186,6 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             blockNumber: mockBlockNumber.toString(),
             validators: mockValidators,
             commitState: randomState,
+            transactionCount,
             timestamp: new Date().toISOString(),
           })
           

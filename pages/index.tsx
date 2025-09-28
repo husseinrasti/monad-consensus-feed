@@ -26,7 +26,7 @@ const HomePage: React.FC = () => {
   }, [blocks]);
 
   const handleBlockStatsUpdate = useCallback((stats: BlockStats) => {
-    const { blockNumber, commitState, blockId } = stats;
+    const { blockNumber, commitState, blockId, transactionCount } = stats;
 
     if (commitState) {
       // Update blocks map with the new commit state
@@ -34,10 +34,11 @@ const HomePage: React.FC = () => {
         const newBlocks = new Map(prevBlocks);
         const currentBlock = newBlocks.get(blockNumber) || {};
         
-        // Update the specific commit state
+        // Update the specific commit state and transaction count
         const updatedBlock = {
           ...currentBlock,
           [commitState]: true,
+          ...(transactionCount !== undefined && { transactionCount }),
         };
         
         newBlocks.set(blockNumber, updatedBlock);

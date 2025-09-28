@@ -16,7 +16,7 @@ const GraphPage: React.FC = () => {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const handleBlockStatsUpdate = useCallback((stats: BlockStats) => {
-    const { blockNumber: statsBlockNumber, commitState, validators } = stats;
+    const { blockNumber: statsBlockNumber, commitState, validators, transactionCount } = stats;
     
     // Only update if this is the block we're watching
     if (blockNumber && statsBlockNumber.toString() === blockNumber.toString()) {
@@ -24,6 +24,7 @@ const GraphPage: React.FC = () => {
         setBlockState(prevState => ({
           ...prevState,
           [commitState]: true,
+          ...(transactionCount !== undefined && { transactionCount }),
         }));
 
         // Update validator data if provided
@@ -35,7 +36,7 @@ const GraphPage: React.FC = () => {
   }, [blockNumber]);
 
   const handleBlockValidatorUpdate = useCallback((data: any) => {
-    const { blockNumber: dataBlockNumber, validators, commitState } = data;
+    const { blockNumber: dataBlockNumber, validators, commitState, transactionCount } = data;
     
     // Only update if this is the block we're watching
     if (blockNumber && dataBlockNumber === blockNumber.toString()) {
@@ -47,6 +48,7 @@ const GraphPage: React.FC = () => {
           setBlockState(prevState => ({
             ...prevState,
             [commitState]: true,
+            ...(transactionCount !== undefined && { transactionCount }),
           }));
         }
       }
@@ -106,6 +108,7 @@ const GraphPage: React.FC = () => {
       if (processedData.consensusFlow.voters.length > 0) newBlockState.Voted = true;
       if (processedData.consensusFlow.finalizer) newBlockState.Finalized = true;
       if (processedData.consensusFlow.verifiers.length > 0) newBlockState.Verified = true;
+      if (processedData.transactionCount !== undefined) newBlockState.transactionCount = processedData.transactionCount;
       
       setBlockState(newBlockState);
       setIsLoading(false);
@@ -287,14 +290,19 @@ const GraphPage: React.FC = () => {
 
       <main className="h-screen w-screen bg-terminal-bg text-terminal-green font-mono overflow-hidden">
         {/* Block Number Header */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 text-center">
           <button
             onClick={handleBlockNumberClick}
-            className="text-2xl md:text-3xl lg:text-4xl terminal-glow tracking-wide hover:text-cyan-400 transition-colors cursor-pointer"
+            className="text-2xl md:text-3xl lg:text-4xl terminal-glow tracking-wide hover:text-cyan-400 transition-colors cursor-pointer block"
             aria-label={`Block #${blockNumber} - Click to view on explorer`}
           >
             BLOCK #{blockNumber}
           </button>
+          {blockState.transactionCount && (
+            <div className="text-sm md:text-base text-terminal-green/80 mt-1">
+              {blockState.transactionCount} transactions
+            </div>
+          )}
         </div>
 
         {/* Back Button */}

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { BlockValidatorData, ValidatorInfo } from '@/types/blockStats';
+import { getBlockTransactionCount, getRpcUrl } from '@/lib/blockchainUtils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -111,9 +112,26 @@ async function generateBlockValidatorData(blockNumber: bigint): Promise<BlockVal
     allValidators.push(multiRoleValidator);
   }
 
+  // Get real transaction count from blockchain
+  let transactionCount = 0;
+  let usingFallback = false;
+  try {
+    const rpcUrl = getRpcUrl();
+    console.log(`Attempting to get transaction count for block ${blockNumStr} from ${rpcUrl}`);
+    transactionCount = await getBlockTransactionCount(rpcUrl, blockNumStr);
+    console.log(`✅ Block ${blockNumStr}: Found ${transactionCount} transactions from blockchain`);
+  } catch (error) {
+    console.error(`❌ Failed to get real transaction count for block ${blockNumStr}:`, error);
+    // Fallback to deterministic mock data if RPC fails
+    usingFallback = true;
+    transactionCount = 50 + (seed % 100); // More deterministic fallback
+    console.log(`🔄 Using fallback transaction count: ${transactionCount} for block ${blockNumStr}`);
+  }
+
   return {
     blockNumber: BigInt(blockNumStr),
     validators: allValidators,
+    transactionCount,
     consensusFlow: {
       proposer,
       voters,

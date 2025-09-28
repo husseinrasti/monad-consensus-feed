@@ -7,6 +7,7 @@ export interface BlockStats {
   blockId?: string | null;
   commitState?: CommitState | null;
   validators?: ValidatorInfo[];
+  transactionCount?: number;
 }
 
 export interface BlockState {
@@ -14,6 +15,7 @@ export interface BlockState {
   Voted?: boolean;
   Finalized?: boolean;
   Verified?: boolean;
+  transactionCount?: number;
 }
 
 export interface ValidatorInfo {
@@ -28,6 +30,7 @@ export interface ValidatorInfo {
 export interface BlockValidatorData {
   blockNumber: bigint;
   validators: ValidatorInfo[];
+  transactionCount?: number;
   consensusFlow: {
     proposer?: ValidatorInfo;
     voters: ValidatorInfo[];
