@@ -444,7 +444,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
             }}
           >
             <div
-              className={`rounded-full border-2 flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 ${getRoleColor(validator.roles)}`}
+              className={`rounded-full border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 ${getRoleColor(validator.roles)} p-1`}
               style={{
                 width: `${nodeSize}px`,
                 height: `${nodeSize}px`,
@@ -453,20 +453,19 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
               onMouseLeave={handleNodeLeave}
               onMouseMove={(e) => handleNodeHover(validator, e)}
             >
-              <div className="text-center">
+              <div className="text-center w-full">
                 <div 
-                  className="font-bold"
-                  style={{ fontSize: `${fontSize}px` }}
+                  className="font-bold text-xs leading-tight"
+                  style={{ fontSize: `${Math.max(8, fontSize * 0.6)}px` }}
                 >
-                  {validator.roles.includes('Proposer') ? 'P' : 
-                   validator.roles.includes('Finalizer') ? 'F' : 
-                   validator.roles.includes('Verifier') ? 'VE' : 'V'}
+                  {validator.roles.join(', ')}
                 </div>
                 <div 
-                  className="opacity-80"
-                  style={{ fontSize: `${labelFontSize}px` }}
+                  className="opacity-90 text-xs truncate w-full leading-tight"
+                  style={{ fontSize: `${Math.max(6, labelFontSize * 0.7)}px` }}
+                  title={validator.address}
                 >
-                  {validator.roles.length > 1 ? 'MULTI' : getPrimaryRole(validator.roles).slice(0, 3).toUpperCase()}
+                  {validator.address.slice(0, 6)}...{validator.address.slice(-4)}
                 </div>
               </div>
             </div>
@@ -487,11 +486,8 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
           <div className="font-bold text-terminal-green mb-1">
             {hoveredNode.validator.roles.join(' + ')}
           </div>
-          <div className="text-xs text-gray-300 mb-1">
+          <div className="text-xs text-gray-300">
             {hoveredNode.validator.address}
-          </div>
-          <div className="text-xs text-gray-400">
-            {new Date(hoveredNode.validator.timestamp).toLocaleTimeString()}
           </div>
         </div>
       )}
