@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import BlockGraphView from '@/components/BlockGraphView';
+import BlockGraphView from '../../components/BlockGraphView';
 import { BlockState, BlockValidatorData, ValidatorInfo, BlockStats } from '@/types/blockStats';
 
 const GraphPage: React.FC = () => {
@@ -306,18 +306,6 @@ const GraphPage: React.FC = () => {
           >
             ← Back
           </button>
-        </div>
-
-        {/* Connection Status */}
-        <div className="absolute top-4 right-4 z-10">
-          <div className={`text-xs px-2 py-1 rounded-sm ${
-            connectionStatus === 'connected' ? 'text-emerald-400 bg-emerald-500/20' :
-            connectionStatus === 'connecting' ? 'text-yellow-400 bg-yellow-500/20' :
-            connectionStatus === 'error' ? 'text-red-400 bg-red-500/20' :
-            'text-gray-400 bg-gray-500/20'
-          }`}>
-            {connectionStatus.toUpperCase()}
-          </div>
         </div>
 
         {/* Graph View */}

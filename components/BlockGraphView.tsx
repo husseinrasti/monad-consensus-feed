@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BlockState, ValidatorInfo, ValidatorRole } from '@/types/blockStats';
+import * as d3 from 'd3';
 
 interface NodePosition {
   x: number;
   y: number;
+}
+
+interface GraphNode extends d3.SimulationNodeDatum {
+  id: string;
+  validator: ValidatorInfo;
+  primaryRole: ValidatorRole;
+  level: number;
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
+  source: GraphNode;
+  target: GraphNode;
+  active: boolean;
 }
 
 interface BlockGraphViewProps {
@@ -74,99 +92,164 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
     return 'Voter'; // fallback
   };
 
-  // Calculate node positions using hierarchical tree layout
-  const nodePositions = useMemo(() => {
+  // Create graph nodes and links for force simulation
+  const { nodes, links } = useMemo(() => {
     if (!dimensions.width || !dimensions.height || validatorData.length === 0) {
+      return { nodes: [], links: [] };
+    }
+
+    // Create nodes with level information for positioning
+    const graphNodes: GraphNode[] = validatorData.map(validator => {
+      const primaryRole = getPrimaryRole(validator.roles);
+      let level = 0;
+      
+      // Assign levels based on consensus flow
+      switch (primaryRole) {
+        case 'Proposer': level = 0; break;
+        case 'Voter': level = 1; break;
+        case 'Finalizer': level = 2; break;
+        case 'Verifier': level = 3; break;
+      }
+
+      return {
+        id: validator.id,
+        validator,
+        primaryRole,
+        level,
+        x: dimensions.width / 2 + (Math.random() - 0.5) * 100, // Small random offset
+        y: dimensions.height / 2 + (Math.random() - 0.5) * 100,
+      };
+    });
+
+    // Create links based on consensus flow
+    const graphLinks: GraphLink[] = [];
+    
+    // Group nodes by role for connection logic
+    const roleGroups = {
+      Proposer: graphNodes.filter(n => n.validator.roles.includes('Proposer')),
+      Voter: graphNodes.filter(n => n.validator.roles.includes('Voter')),
+      Finalizer: graphNodes.filter(n => n.validator.roles.includes('Finalizer')),
+      Verifier: graphNodes.filter(n => n.validator.roles.includes('Verifier')),
+    };
+
+    // Proposer → Voters
+    if (roleGroups.Proposer.length > 0 && roleGroups.Voter.length > 0) {
+      const proposer = roleGroups.Proposer[0];
+      roleGroups.Voter.forEach(voter => {
+        graphLinks.push({
+          source: proposer,
+          target: voter,
+          active: blockState.Voted || false,
+        });
+      });
+    }
+
+    // Voters → Finalizer
+    if (roleGroups.Voter.length > 0 && roleGroups.Finalizer.length > 0) {
+      const finalizer = roleGroups.Finalizer[0];
+      roleGroups.Voter.forEach(voter => {
+        graphLinks.push({
+          source: voter,
+          target: finalizer,
+          active: blockState.Finalized || false,
+        });
+      });
+    }
+
+    // Finalizer → Verifiers
+    if (roleGroups.Finalizer.length > 0 && roleGroups.Verifier.length > 0) {
+      const finalizer = roleGroups.Finalizer[0];
+      roleGroups.Verifier.forEach(verifier => {
+        graphLinks.push({
+          source: finalizer,
+          target: verifier,
+          active: blockState.Verified || false,
+        });
+      });
+    }
+
+    return { nodes: graphNodes, links: graphLinks };
+  }, [validatorData, dimensions, blockState]);
+
+  // Force simulation for dynamic layout
+  const nodePositions = useMemo(() => {
+    if (!dimensions.width || !dimensions.height || nodes.length === 0) {
       return new Map<string, NodePosition>();
     }
 
+    const nodeRadius = Math.min(35, Math.max(25, dimensions.width / 25));
     const positions = new Map<string, NodePosition>();
-    const nodeRadius = Math.min(35, Math.max(25, dimensions.width / 25)); // Responsive node size
-    const minNodeSpacing = nodeRadius * 2.5; // Minimum spacing between nodes
-    const levelHeight = Math.max(80, dimensions.height / 6); // Vertical spacing between levels
+
+    // Calculate dynamic parameters based on container size and node count
+    const totalNodes = nodes.length;
+    const containerArea = dimensions.width * dimensions.height;
+    const optimalDistance = Math.sqrt(containerArea / totalNodes) * 0.8;
+    const linkDistance = Math.max(80, Math.min(150, optimalDistance));
+    const repulsionStrength = -Math.max(400, linkDistance * 8);
     
-    // Group validators by primary role (for positioning)
-    const roleGroups = {
-      Proposer: validatorData.filter(v => getPrimaryRole(v.roles) === 'Proposer'),
-      Voter: validatorData.filter(v => getPrimaryRole(v.roles) === 'Voter'),
-      Finalizer: validatorData.filter(v => getPrimaryRole(v.roles) === 'Finalizer'),
-      Verifier: validatorData.filter(v => getPrimaryRole(v.roles) === 'Verifier'),
-    };
+    // Create simulation with adaptive parameters
+    const simulation = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(links)
+        .id((d: any) => d.id)
+        .distance(linkDistance)
+        .strength(0.7)
+      )
+      .force('charge', d3.forceManyBody()
+        .strength(repulsionStrength)
+        .distanceMax(linkDistance * 2)
+      )
+      .force('center', d3.forceCenter(dimensions.width / 2, dimensions.height / 2))
+      .force('collision', d3.forceCollide()
+        .radius(nodeRadius * 1.5) // Prevent overlap with comfortable spacing
+        .strength(1.0)
+      )
+      // Vertical positioning force to maintain hierarchy
+      .force('y', d3.forceY()
+        .y((d: any) => {
+          const availableHeight = dimensions.height * 0.7; // Use 70% of height
+          const levelHeight = availableHeight / 4; // 4 levels max
+          const startY = dimensions.height * 0.15; // Start 15% from top
+          return startY + (d.level * levelHeight);
+        })
+        .strength(0.4)
+      )
+      // Horizontal spreading for same-level nodes
+      .force('x', d3.forceX()
+        .x((d: any) => {
+          const sameLevel = nodes.filter(n => n.level === d.level);
+          if (sameLevel.length === 1) return dimensions.width / 2;
+          
+          const index = sameLevel.findIndex(n => n.id === d.id);
+          const availableWidth = dimensions.width * 0.9; // Use 90% of width
+          const optimalSpacing = Math.min(availableWidth, sameLevel.length * nodeRadius * 4);
+          const spacing = sameLevel.length > 1 ? optimalSpacing / (sameLevel.length - 1) : 0;
+          const startX = dimensions.width / 2 - optimalSpacing / 2;
+          return startX + (index * spacing);
+        })
+        .strength(0.3)
+      );
 
-    // Calculate the total height needed for the tree
-    const levels = [
-      roleGroups.Proposer.length > 0 ? 1 : 0,
-      roleGroups.Voter.length > 0 ? 1 : 0,
-      roleGroups.Finalizer.length > 0 ? 1 : 0,
-      roleGroups.Verifier.length > 0 ? 1 : 0,
-    ].filter(Boolean).length;
+    // Run simulation synchronously for initial positions
+    simulation.stop();
     
-    const totalTreeHeight = (levels - 1) * levelHeight;
-    const startY = (dimensions.height - totalTreeHeight) / 2;
-
-    let currentLevel = 0;
-
-    // Level 1: Proposer (Root) - Top center
-    if (roleGroups.Proposer.length > 0) {
-      const proposer = roleGroups.Proposer[0];
-      positions.set(proposer.id, {
-        x: dimensions.width / 2,
-        y: startY + (currentLevel * levelHeight),
-      });
-      currentLevel++;
+    // Run multiple ticks to stabilize
+    for (let i = 0; i < 300; ++i) {
+      simulation.tick();
     }
 
-    // Level 2: Voters - Horizontally distributed
-    if (roleGroups.Voter.length > 0) {
-      const voterCount = roleGroups.Voter.length;
-      const totalWidth = Math.max(
-        minNodeSpacing * (voterCount - 1),
-        Math.min(dimensions.width * 0.8, voterCount * minNodeSpacing)
-      );
-      const spacing = voterCount > 1 ? totalWidth / (voterCount - 1) : 0;
-      const startX = dimensions.width / 2 - totalWidth / 2;
-      
-      roleGroups.Voter.forEach((voter, index) => {
-        positions.set(voter.id, {
-          x: voterCount === 1 ? dimensions.width / 2 : startX + (index * spacing),
-          y: startY + (currentLevel * levelHeight),
-        });
+    // Extract final positions with proper margins
+    const margin = nodeRadius + 20; // Extra margin for better visual spacing
+    nodes.forEach(node => {
+      positions.set(node.id, {
+        x: Math.max(margin, Math.min(dimensions.width - margin, node.x || dimensions.width / 2)),
+        y: Math.max(margin, Math.min(dimensions.height - margin, node.y || dimensions.height / 2)),
       });
-      currentLevel++;
-    }
-
-    // Level 3: Finalizer - Center
-    if (roleGroups.Finalizer.length > 0) {
-      const finalizer = roleGroups.Finalizer[0];
-      positions.set(finalizer.id, {
-        x: dimensions.width / 2,
-        y: startY + (currentLevel * levelHeight),
-      });
-      currentLevel++;
-    }
-
-    // Level 4: Verifiers - Horizontally distributed at bottom
-    if (roleGroups.Verifier.length > 0) {
-      const verifierCount = roleGroups.Verifier.length;
-      const totalWidth = Math.max(
-        minNodeSpacing * (verifierCount - 1),
-        Math.min(dimensions.width * 0.8, verifierCount * minNodeSpacing)
-      );
-      const spacing = verifierCount > 1 ? totalWidth / (verifierCount - 1) : 0;
-      const startX = dimensions.width / 2 - totalWidth / 2;
-      
-      roleGroups.Verifier.forEach((verifier, index) => {
-        positions.set(verifier.id, {
-          x: verifierCount === 1 ? dimensions.width / 2 : startX + (index * spacing),
-          y: startY + (currentLevel * levelHeight),
-        });
-      });
-    }
+    });
 
     return positions;
-  }, [validatorData, dimensions]);
+  }, [nodes, links, dimensions]);
 
-  // Calculate edge positions that connect to node borders, not centers
+  // Calculate edge positions that connect to node borders with proper spacing
   const calculateEdgePoints = (from: NodePosition, to: NodePosition, nodeRadius: number) => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
@@ -177,19 +260,22 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
     const unitX = dx / distance;
     const unitY = dy / distance;
     
+    // Add extra spacing to prevent arrowheads from touching nodes
+    const spacing = nodeRadius + 8;
+    
     return {
       from: {
-        x: from.x + unitX * nodeRadius,
-        y: from.y + unitY * nodeRadius,
+        x: from.x + unitX * spacing,
+        y: from.y + unitY * spacing,
       },
       to: {
-        x: to.x - unitX * nodeRadius,
-        y: to.y - unitY * nodeRadius,
+        x: to.x - unitX * spacing,
+        y: to.y - unitY * spacing,
       },
     };
   };
 
-  // Generate connections between nodes based on consensus flow
+  // Generate connections between nodes based on the graph links
   const connections = useMemo(() => {
     const nodeRadius = Math.min(35, Math.max(25, dimensions.width / 25));
     const conns: Array<{ 
@@ -200,76 +286,24 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
       edgeTo: NodePosition;
     }> = [];
     
-    // Group validators by all their roles (for connections)
-    const roleGroups = {
-      Proposer: validatorData.filter(v => v.roles.includes('Proposer')),
-      Voter: validatorData.filter(v => v.roles.includes('Voter')),
-      Finalizer: validatorData.filter(v => v.roles.includes('Finalizer')),
-      Verifier: validatorData.filter(v => v.roles.includes('Verifier')),
-    };
-
-    // Proposer → Voters
-    if (roleGroups.Proposer.length > 0 && roleGroups.Voter.length > 0) {
-      const proposerPos = nodePositions.get(roleGroups.Proposer[0].id);
-      if (proposerPos) {
-        roleGroups.Voter.forEach(voter => {
-          const voterPos = nodePositions.get(voter.id);
-          if (voterPos) {
-            const edgePoints = calculateEdgePoints(proposerPos, voterPos, nodeRadius);
-            conns.push({
-              from: proposerPos,
-              to: voterPos,
-              edgeFrom: edgePoints.from,
-              edgeTo: edgePoints.to,
-              active: blockState.Voted || false,
-            });
-          }
+    links.forEach(link => {
+      const sourcePos = nodePositions.get(link.source.id);
+      const targetPos = nodePositions.get(link.target.id);
+      
+      if (sourcePos && targetPos) {
+        const edgePoints = calculateEdgePoints(sourcePos, targetPos, nodeRadius);
+        conns.push({
+          from: sourcePos,
+          to: targetPos,
+          edgeFrom: edgePoints.from,
+          edgeTo: edgePoints.to,
+          active: link.active,
         });
       }
-    }
-
-    // Voters → Finalizer
-    if (roleGroups.Voter.length > 0 && roleGroups.Finalizer.length > 0) {
-      const finalizerPos = nodePositions.get(roleGroups.Finalizer[0].id);
-      if (finalizerPos) {
-        roleGroups.Voter.forEach(voter => {
-          const voterPos = nodePositions.get(voter.id);
-          if (voterPos) {
-            const edgePoints = calculateEdgePoints(voterPos, finalizerPos, nodeRadius);
-            conns.push({
-              from: voterPos,
-              to: finalizerPos,
-              edgeFrom: edgePoints.from,
-              edgeTo: edgePoints.to,
-              active: blockState.Finalized || false,
-            });
-          }
-        });
-      }
-    }
-
-    // Finalizer → Verifiers
-    if (roleGroups.Finalizer.length > 0 && roleGroups.Verifier.length > 0) {
-      const finalizerPos = nodePositions.get(roleGroups.Finalizer[0].id);
-      if (finalizerPos) {
-        roleGroups.Verifier.forEach(verifier => {
-          const verifierPos = nodePositions.get(verifier.id);
-          if (verifierPos) {
-            const edgePoints = calculateEdgePoints(finalizerPos, verifierPos, nodeRadius);
-            conns.push({
-              from: finalizerPos,
-              to: verifierPos,
-              edgeFrom: edgePoints.from,
-              edgeTo: edgePoints.to,
-              active: blockState.Verified || false,
-            });
-          }
-        });
-      }
-    }
+    });
 
     return conns;
-  }, [validatorData, nodePositions, blockState, dimensions.width]);
+  }, [links, nodePositions, dimensions.width]);
 
   const handleNodeHover = (validator: ValidatorInfo, event: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -303,8 +337,12 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="h-full w-full relative overflow-hidden"
-      style={{ minHeight: '400px' }}
+      className="h-full w-full relative overflow-hidden bg-transparent"
+      style={{ 
+        minHeight: '400px',
+        // Ensure the graph scales properly on different screen sizes
+        aspectRatio: dimensions.width && dimensions.height ? `${dimensions.width}/${dimensions.height}` : 'auto',
+      }}
     >
       {/* SVG for connections */}
       <svg
@@ -314,15 +352,15 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
         <defs>
           <marker
             id="arrowhead"
-            markerWidth="12"
-            markerHeight="8"
-            refX="11"
-            refY="4"
+            markerWidth="10"
+            markerHeight="10"
+            refX="8"
+            refY="5"
             orient="auto"
             markerUnits="strokeWidth"
           >
             <polygon
-              points="0 0, 12 4, 0 8"
+              points="0 2, 8 5, 0 8"
               fill="rgba(34, 197, 94, 0.6)"
               stroke="rgba(34, 197, 94, 0.6)"
               strokeWidth="1"
@@ -330,38 +368,52 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
           </marker>
           <marker
             id="arrowhead-active"
-            markerWidth="12"
-            markerHeight="8"
-            refX="11"
-            refY="4"
+            markerWidth="10"
+            markerHeight="10"
+            refX="8"
+            refY="5"
             orient="auto"
             markerUnits="strokeWidth"
           >
             <polygon
-              points="0 0, 12 4, 0 8"
+              points="0 2, 8 5, 0 8"
               fill="#06b6d4"
               stroke="#06b6d4"
               strokeWidth="1"
             />
           </marker>
         </defs>
-        {connections.map((conn, index) => (
-          <line
-            key={`${index}-${animationKey}`}
-            x1={conn.edgeFrom.x}
-            y1={conn.edgeFrom.y}
-            x2={conn.edgeTo.x}
-            y2={conn.edgeTo.y}
-            stroke={conn.active ? '#06b6d4' : 'rgba(34, 197, 94, 0.4)'}
-            strokeWidth={conn.active ? 3 : 2}
-            strokeDasharray={conn.active ? 'none' : '6,4'}
-            markerEnd={conn.active ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
-            className={`transition-all duration-700 ${conn.active ? 'animate-pulse' : ''}`}
-            style={{
-              filter: conn.active ? 'drop-shadow(0 0 6px #06b6d4)' : 'none',
-            }}
-          />
-        ))}
+        {connections.map((conn, index) => {
+          // Calculate control point for curved edges
+          const midX = (conn.edgeFrom.x + conn.edgeTo.x) / 2;
+          const midY = (conn.edgeFrom.y + conn.edgeTo.y) / 2;
+          const dx = conn.edgeTo.x - conn.edgeFrom.x;
+          const dy = conn.edgeTo.y - conn.edgeFrom.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Create a subtle curve by offsetting the control point
+          const curvature = Math.min(50, distance * 0.2);
+          const controlX = midX + (-dy / distance) * curvature;
+          const controlY = midY + (dx / distance) * curvature;
+          
+          const pathData = `M ${conn.edgeFrom.x} ${conn.edgeFrom.y} Q ${controlX} ${controlY} ${conn.edgeTo.x} ${conn.edgeTo.y}`;
+          
+          return (
+            <path
+              key={`${index}-${animationKey}`}
+              d={pathData}
+              fill="none"
+              stroke={conn.active ? '#06b6d4' : 'rgba(34, 197, 94, 0.4)'}
+              strokeWidth={conn.active ? 3 : 2}
+              strokeDasharray={conn.active ? 'none' : '6,4'}
+              markerEnd={conn.active ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
+              className={`transition-all duration-700 ${conn.active ? 'animate-pulse' : ''}`}
+              style={{
+                filter: conn.active ? 'drop-shadow(0 0 6px #06b6d4)' : 'none',
+              }}
+            />
+          );
+        })}
       </svg>
 
       {/* Nodes */}
