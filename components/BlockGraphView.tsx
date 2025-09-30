@@ -493,7 +493,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-terminal-bg/80 border border-terminal-green/40 rounded-sm p-3 text-xs">
+      {/* <div className="absolute bottom-4 left-4 bg-terminal-bg/80 border border-terminal-green/40 rounded-sm p-3 text-xs">
         <div className="font-bold text-terminal-green mb-2">Validator Roles</div>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -513,7 +513,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
             <span>Verifier</span>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

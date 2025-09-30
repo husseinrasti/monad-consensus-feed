@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { BlockState } from '@/types/blockStats';
+import BlockGraphDialog from './BlockGraphDialog';
 
 interface BlockStatsTableProps {
   blocks: Map<bigint, BlockState>;
@@ -33,6 +34,10 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
   // Responsive column count with mobile-specific logic
   const [numCols, setNumCols] = useState<number>(6);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [selectedBlockNumber, setSelectedBlockNumber] = useState<string>('');
   
   useEffect(() => {
     const computeCols = () => {
@@ -320,34 +325,19 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
     return per;
   }, [verifiedStack, numCols, isMobile]);
 
-  // Opacity gradient for older stacks
-  const computeStackOpacity = (indexFromBottom: number, total: number): number => {
-    if (total <= 1) return 1;
-    const minOpacity = 0.25;
-    const t = indexFromBottom / (total - 1);
-    return minOpacity + (1 - minOpacity) * (1 - t);
-  };
-
   const getBlockColorClass = (key: string): string => {
     const s = stateByBlock.get(key) || {};
     return indexToGlowClass(stateToIndex(s));
   };
 
-  const indexToTopPercent = (idx: CommitIndex): string => {
-    if (idx <= 0) return '0%';
-    if (idx === 1) return '33%';
-    if (idx === 2) return '66%';
-    return '75%';
+  const handleClickOpen = (key: string, event: React.MouseEvent) => {
+    setSelectedBlockNumber(key);
+    setIsModalOpen(true);
   };
 
-  const handleClickOpen = (key: string, event: React.MouseEvent) => {
-    // Check if Ctrl/Cmd key is pressed for graph view
-    if (event.ctrlKey || event.metaKey) {
-      router.push(`/graph/${key}`);
-    } else {
-      const url = `https://testnet.monadexplorer.com/block/${key}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedBlockNumber('');
   };
 
   // Build unverified per column using locked assignment
@@ -391,9 +381,6 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
         <div className="flex items-center gap-1">
           <span className="inline-block h-3 w-3 rounded-sm bg-emerald-600/50 shadow-[0_0_8px_#10b981] border border-emerald-400" />
           <span className="text-terminal-green/90">Verified</span>
-        </div>
-        <div className="hidden sm:flex items-center gap-1 ml-4 text-gray-400">
-          <span className="text-[10px]">💡 Ctrl+Click for Graph View</span>
         </div>
       </div>
 
@@ -480,6 +467,13 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
           ))}
         </div>
       </div>
+
+      {/* Block Graph Modal */}
+      <BlockGraphDialog
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        blockNumber={selectedBlockNumber}
+      />
     </div>
   );
 };
