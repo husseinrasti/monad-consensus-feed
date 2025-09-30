@@ -183,8 +183,8 @@ const BlockGraphDialog: React.FC<BlockGraphDialogProps> = ({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="h-[calc(100%-7rem)] w-full">
+        {/* Content - Scrollable Graph Container */}
+        <div className="h-[calc(100%-7rem)] w-full overflow-auto">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -208,11 +208,57 @@ const BlockGraphDialog: React.FC<BlockGraphDialogProps> = ({
               </div>
             </div>
           ) : (
-            <BlockGraphView
-              blockNumber={blockNumber}
-              blockState={blockState}
-              validatorData={validatorData}
-            />
+            <div className="relative">
+              {/* Graph Controls */}
+              <div className="absolute top-2 right-2 z-10 flex gap-2">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => {
+                      const graphView = document.getElementById('block-graph-view');
+                      if (graphView) {
+                        const event = new CustomEvent('graph-zoom-in');
+                        graphView.dispatchEvent(event);
+                      }
+                    }}
+                    className="w-8 h-8 text-sm bg-terminal-bg/80 border border-terminal-green/40 rounded-sm hover:bg-terminal-green/10 transition-colors text-terminal-green flex items-center justify-center"
+                    title="Zoom in"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => {
+                      const graphView = document.getElementById('block-graph-view');
+                      if (graphView) {
+                        const event = new CustomEvent('graph-zoom-out');
+                        graphView.dispatchEvent(event);
+                      }
+                    }}
+                    className="w-8 h-8 text-sm bg-terminal-bg/80 border border-terminal-green/40 rounded-sm hover:bg-terminal-green/10 transition-colors text-terminal-green flex items-center justify-center"
+                    title="Zoom out"
+                  >
+                    −
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    const graphView = document.getElementById('block-graph-view');
+                    if (graphView) {
+                      const event = new CustomEvent('graph-reset-zoom');
+                      graphView.dispatchEvent(event);
+                    }
+                  }}
+                  className="px-2 py-1 text-xs bg-terminal-bg/80 border border-terminal-green/40 rounded-sm hover:bg-terminal-green/10 transition-colors text-terminal-green"
+                  title="Reset zoom and position"
+                >
+                  Reset
+                </button>
+              </div>
+              <BlockGraphView
+                blockNumber={blockNumber}
+                blockState={blockState}
+                validatorData={validatorData}
+              />
+            </div>
           )}
         </div>
       </div>

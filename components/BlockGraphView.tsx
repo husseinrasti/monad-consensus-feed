@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { BlockState, ValidatorInfo, ValidatorRole } from '@/types/blockStats';
 import * as d3 from 'd3';
 
@@ -45,6 +45,13 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [animationKey, setAnimationKey] = useState(0);
+  
+  // Zoom and pan state
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const graphRef = useRef<HTMLDivElement>(null);
+  const [graphDimensions, setGraphDimensions] = useState({ width: 0, height: 0 });
 
   // Update dimensions on resize
   useEffect(() => {
@@ -52,6 +59,11 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         setDimensions({ width: rect.width, height: rect.height });
+        
+        // Set minimum graph size to be larger than container for better zooming
+        const minGraphWidth = Math.max(rect.width, 800);
+        const minGraphHeight = Math.max(rect.height, 600);
+        setGraphDimensions({ width: minGraphWidth, height: minGraphHeight });
       }
     };
 
@@ -59,6 +71,107 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // Zoom and pan event handlers
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY * -0.001;
+    const newScale = Math.min(Math.max(0.1, transform.scale + delta), 3);
+    
+    // Zoom towards mouse position
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const scaleRatio = newScale / transform.scale;
+      const newX = mouseX - (mouseX - transform.x) * scaleRatio;
+      const newY = mouseY - (mouseY - transform.y) * scaleRatio;
+      
+      setTransform({ x: newX, y: newY, scale: newScale });
+    }
+  }, [transform]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 0) { // Left click only
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
+    }
+  }, [transform]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+      setTransform(prev => ({
+        ...prev,
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      }));
+    }
+  }, [isDragging, dragStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Touch handlers for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setIsDragging(true);
+      setDragStart({ x: touch.clientX - transform.x, y: touch.clientY - transform.y });
+    }
+  }, [transform]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isDragging && e.touches.length === 1) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      setTransform(prev => ({
+        ...prev,
+        x: touch.clientX - dragStart.x,
+        y: touch.clientY - dragStart.y,
+      }));
+    }
+  }, [isDragging, dragStart]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Reset zoom function
+  const resetZoom = useCallback(() => {
+    setTransform({ x: 0, y: 0, scale: 1 });
+  }, []);
+
+  // Listen for control events from parent
+  useEffect(() => {
+    const handleResetZoom = () => resetZoom();
+    const handleZoomIn = () => {
+      setTransform(prev => ({
+        ...prev,
+        scale: Math.min(prev.scale * 1.2, 3)
+      }));
+    };
+    const handleZoomOut = () => {
+      setTransform(prev => ({
+        ...prev,
+        scale: Math.max(prev.scale / 1.2, 0.1)
+      }));
+    };
+    
+    const element = containerRef.current;
+    if (element) {
+      element.addEventListener('graph-reset-zoom', handleResetZoom);
+      element.addEventListener('graph-zoom-in', handleZoomIn);
+      element.addEventListener('graph-zoom-out', handleZoomOut);
+      return () => {
+        element.removeEventListener('graph-reset-zoom', handleResetZoom);
+        element.removeEventListener('graph-zoom-in', handleZoomIn);
+        element.removeEventListener('graph-zoom-out', handleZoomOut);
+      };
+    }
+  }, [resetZoom]);
 
   // Trigger animation when validator data changes
   useEffect(() => {
@@ -94,7 +207,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
 
   // Create graph nodes and links for force simulation
   const { nodes, links } = useMemo(() => {
-    if (!dimensions.width || !dimensions.height || validatorData.length === 0) {
+    if (!graphDimensions.width || !graphDimensions.height || validatorData.length === 0) {
       return { nodes: [], links: [] };
     }
 
@@ -116,8 +229,8 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
         validator,
         primaryRole,
         level,
-        x: dimensions.width / 2 + (Math.random() - 0.5) * 100, // Small random offset
-        y: dimensions.height / 2 + (Math.random() - 0.5) * 100,
+        x: graphDimensions.width / 2 + (Math.random() - 0.5) * 100, // Small random offset
+        y: graphDimensions.height / 2 + (Math.random() - 0.5) * 100,
       };
     });
 
@@ -169,20 +282,20 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
     }
 
     return { nodes: graphNodes, links: graphLinks };
-  }, [validatorData, dimensions, blockState]);
+  }, [validatorData, graphDimensions, blockState]);
 
   // Force simulation for dynamic layout
   const nodePositions = useMemo(() => {
-    if (!dimensions.width || !dimensions.height || nodes.length === 0) {
+    if (!graphDimensions.width || !graphDimensions.height || nodes.length === 0) {
       return new Map<string, NodePosition>();
     }
 
-    const nodeRadius = Math.min(35, Math.max(25, dimensions.width / 25));
+    const nodeRadius = Math.min(35, Math.max(25, Math.min(dimensions.width, graphDimensions.width) / 25));
     const positions = new Map<string, NodePosition>();
 
-    // Calculate dynamic parameters based on container size and node count
+    // Calculate dynamic parameters based on graph size and node count
     const totalNodes = nodes.length;
-    const containerArea = dimensions.width * dimensions.height;
+    const containerArea = graphDimensions.width * graphDimensions.height;
     const optimalDistance = Math.sqrt(containerArea / totalNodes) * 0.8;
     const linkDistance = Math.max(80, Math.min(150, optimalDistance));
     const repulsionStrength = -Math.max(400, linkDistance * 8);
@@ -198,7 +311,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
         .strength(repulsionStrength)
         .distanceMax(linkDistance * 2)
       )
-      .force('center', d3.forceCenter(dimensions.width / 2, dimensions.height / 2))
+      .force('center', d3.forceCenter(graphDimensions.width / 2, graphDimensions.height / 2))
       .force('collision', d3.forceCollide()
         .radius(nodeRadius * 1.5) // Prevent overlap with comfortable spacing
         .strength(1.0)
@@ -206,9 +319,9 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
       // Vertical positioning force to maintain hierarchy
       .force('y', d3.forceY()
         .y((d: any) => {
-          const availableHeight = dimensions.height * 0.7; // Use 70% of height
+          const availableHeight = graphDimensions.height * 0.7; // Use 70% of height
           const levelHeight = availableHeight / 4; // 4 levels max
-          const startY = dimensions.height * 0.15; // Start 15% from top
+          const startY = graphDimensions.height * 0.15; // Start 15% from top
           return startY + (d.level * levelHeight);
         })
         .strength(0.4)
@@ -217,13 +330,13 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
       .force('x', d3.forceX()
         .x((d: any) => {
           const sameLevel = nodes.filter(n => n.level === d.level);
-          if (sameLevel.length === 1) return dimensions.width / 2;
+          if (sameLevel.length === 1) return graphDimensions.width / 2;
           
           const index = sameLevel.findIndex(n => n.id === d.id);
-          const availableWidth = dimensions.width * 0.9; // Use 90% of width
+          const availableWidth = graphDimensions.width * 0.9; // Use 90% of width
           const optimalSpacing = Math.min(availableWidth, sameLevel.length * nodeRadius * 4);
           const spacing = sameLevel.length > 1 ? optimalSpacing / (sameLevel.length - 1) : 0;
-          const startX = dimensions.width / 2 - optimalSpacing / 2;
+          const startX = graphDimensions.width / 2 - optimalSpacing / 2;
           return startX + (index * spacing);
         })
         .strength(0.3)
@@ -241,13 +354,13 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
     const margin = nodeRadius + 20; // Extra margin for better visual spacing
     nodes.forEach(node => {
       positions.set(node.id, {
-        x: Math.max(margin, Math.min(dimensions.width - margin, node.x || dimensions.width / 2)),
-        y: Math.max(margin, Math.min(dimensions.height - margin, node.y || dimensions.height / 2)),
+        x: Math.max(margin, Math.min(graphDimensions.width - margin, node.x || graphDimensions.width / 2)),
+        y: Math.max(margin, Math.min(graphDimensions.height - margin, node.y || graphDimensions.height / 2)),
       });
     });
 
     return positions;
-  }, [nodes, links, dimensions]);
+  }, [nodes, links, graphDimensions]);
 
   // Calculate edge positions that connect to node borders with proper spacing
   const calculateEdgePoints = (from: NodePosition, to: NodePosition, nodeRadius: number) => {
@@ -277,7 +390,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
 
   // Generate connections between nodes based on the graph links
   const connections = useMemo(() => {
-    const nodeRadius = Math.min(35, Math.max(25, dimensions.width / 25));
+    const nodeRadius = Math.min(35, Math.max(25, Math.min(dimensions.width, graphDimensions.width) / 25));
     const conns: Array<{ 
       from: NodePosition; 
       to: NodePosition; 
@@ -303,7 +416,7 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
     });
 
     return conns;
-  }, [links, nodePositions, dimensions.width]);
+  }, [links, nodePositions, graphDimensions.width]);
 
   const handleNodeHover = (validator: ValidatorInfo, event: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -337,18 +450,37 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="h-full w-full relative overflow-hidden bg-transparent"
+      id="block-graph-view"
+      className="h-full w-full relative bg-transparent select-none"
       style={{ 
         minHeight: '400px',
-        // Ensure the graph scales properly on different screen sizes
-        aspectRatio: dimensions.width && dimensions.height ? `${dimensions.width}/${dimensions.height}` : 'auto',
+        cursor: isDragging ? 'grabbing' : 'grab',
       }}
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
-      {/* SVG for connections */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 1 }}
+      {/* Zoomable/Pannable Graph Container */}
+      <div
+        ref={graphRef}
+        className="absolute inset-0 origin-top-left"
+        style={{
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+          width: `${graphDimensions.width}px`,
+          height: `${graphDimensions.height}px`,
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+        }}
       >
+        {/* SVG for connections */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{ zIndex: 1 }}
+        >
         <defs>
           <marker
             id="arrowhead"
@@ -416,43 +548,54 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
         })}
       </svg>
 
-      {/* Nodes */}
-      {validatorData.map((validator) => {
-        const position = nodePositions.get(validator.id);
-        if (!position) return null;
+        {/* Nodes */}
+        {validatorData.map((validator) => {
+          const position = nodePositions.get(validator.id);
+          if (!position) return null;
 
-        const nodeRadius = Math.min(35, Math.max(25, dimensions.width / 25));
-        const nodeSize = nodeRadius * 2;
-        const fontSize = Math.max(10, nodeRadius / 3);
-        const labelFontSize = Math.max(8, nodeRadius / 4.5);
+          const nodeRadius = Math.min(35, Math.max(25, Math.min(dimensions.width, graphDimensions.width) / 25));
+          const nodeSize = nodeRadius * 2;
+          const fontSize = Math.max(10, nodeRadius / 3);
+          const labelFontSize = Math.max(8, nodeRadius / 4.5);
 
-        const isActive = 
-          (validator.roles.includes('Proposer') && blockState.Proposed) ||
-          (validator.roles.includes('Voter') && blockState.Voted) ||
-          (validator.roles.includes('Finalizer') && blockState.Finalized) ||
-          (validator.roles.includes('Verifier') && blockState.Verified);
+          const isActive = 
+            (validator.roles.includes('Proposer') && blockState.Proposed) ||
+            (validator.roles.includes('Voter') && blockState.Voted) ||
+            (validator.roles.includes('Finalizer') && blockState.Finalized) ||
+            (validator.roles.includes('Verifier') && blockState.Verified);
 
-        return (
-          <div
-            key={`${validator.id}-${animationKey}`}
-            className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out ${isActive ? 'animate-pulse' : ''}`}
-            style={{
-              left: position.x,
-              top: position.y,
-              zIndex: 2,
-              animationDelay: `${validatorData.indexOf(validator) * 100}ms`,
-            }}
-          >
+          return (
             <div
-              className={`rounded-full border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 ${getRoleColor(validator.roles)} p-1`}
+              key={`${validator.id}-${animationKey}`}
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out ${isActive ? 'animate-pulse' : ''}`}
               style={{
-                width: `${nodeSize}px`,
-                height: `${nodeSize}px`,
+                left: position.x,
+                top: position.y,
+                zIndex: 2,
+                animationDelay: `${validatorData.indexOf(validator) * 100}ms`,
+                pointerEvents: 'auto',
               }}
-              onMouseEnter={(e) => handleNodeHover(validator, e)}
-              onMouseLeave={handleNodeLeave}
-              onMouseMove={(e) => handleNodeHover(validator, e)}
             >
+              <div
+                className={`rounded-full border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 ${getRoleColor(validator.roles)} p-1`}
+                style={{
+                  width: `${nodeSize}px`,
+                  height: `${nodeSize}px`,
+                }}
+                onMouseEnter={(e) => {
+                  e.stopPropagation();
+                  handleNodeHover(validator, e);
+                }}
+                onMouseLeave={(e) => {
+                  e.stopPropagation();
+                  handleNodeLeave();
+                }}
+                onMouseMove={(e) => {
+                  e.stopPropagation();
+                  handleNodeHover(validator, e);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
               <div className="text-center w-full">
                 <div 
                   className="font-bold text-xs leading-tight"
@@ -467,13 +610,14 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
                 >
                   {validator.address.slice(0, 6)}...{validator.address.slice(-4)}
                 </div>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
-      {/* Tooltip */}
+      {/* Tooltip - outside the transform container */}
       {hoveredNode && (
         <div
           className="absolute pointer-events-none z-50 bg-terminal-bg/95 border border-terminal-green/40 rounded-sm p-3 text-sm shadow-lg"
@@ -491,6 +635,11 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Zoom level indicator */}
+      <div className="absolute bottom-4 left-4 z-10 bg-terminal-bg/80 border border-terminal-green/40 rounded-sm p-2 text-xs text-terminal-green">
+        Zoom: {Math.round(transform.scale * 100)}%
+      </div>
 
       {/* Legend */}
       {/* <div className="absolute bottom-4 left-4 bg-terminal-bg/80 border border-terminal-green/40 rounded-sm p-3 text-xs">
