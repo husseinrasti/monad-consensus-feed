@@ -16,7 +16,7 @@ const GraphPage: React.FC = () => {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const handleBlockStatsUpdate = useCallback((stats: BlockStats) => {
-    const { blockNumber: statsBlockNumber, commitState, validators, transactionCount } = stats;
+    const { blockNumber: statsBlockNumber, commitState, transactionCount } = stats;
     
     // Only update if this is the block we're watching
     if (blockNumber && statsBlockNumber.toString() === blockNumber.toString()) {
@@ -26,22 +26,44 @@ const GraphPage: React.FC = () => {
           [commitState]: true,
           ...(transactionCount !== undefined && { transactionCount }),
         }));
-
-        // Update validator data if provided
-        if (validators && Array.isArray(validators)) {
-          setValidatorData(validators);
-        }
       }
     }
   }, [blockNumber]);
 
   const handleBlockValidatorUpdate = useCallback((data: any) => {
-    const { blockNumber: dataBlockNumber, validators, commitState, transactionCount } = data;
+    const { blockNumber: dataBlockNumber, validators, consensusFlow, commitState, transactionCount } = data;
     
     // Only update if this is the block we're watching
     if (blockNumber && dataBlockNumber === blockNumber.toString()) {
+      console.log(`[Graph] Received blockValidators update for block ${dataBlockNumber}:`, {
+        validatorCount: validators?.length || 0,
+        hasConsensusFlow: !!consensusFlow,
+        voters: consensusFlow?.voters?.length || 0,
+        verifiers: consensusFlow?.verifiers?.length || 0,
+      });
+      
       if (validators && Array.isArray(validators)) {
         setValidatorData(validators);
+        
+        // Update block validator data with consensus flow if available
+        if (consensusFlow) {
+          setBlockValidatorData(prevData => {
+            if (!prevData) {
+              return {
+                blockNumber: BigInt(dataBlockNumber),
+                validators,
+                consensusFlow,
+                transactionCount,
+              };
+            }
+            return {
+              ...prevData,
+              validators,
+              consensusFlow,
+              transactionCount: transactionCount ?? prevData.transactionCount,
+            };
+          });
+        }
         
         // Update block state based on the latest commit state
         if (commitState) {
@@ -148,7 +170,7 @@ const GraphPage: React.FC = () => {
           blockNumber?: string; 
           blockId?: string | null; 
           commitState?: BlockStats['commitState'];
-          validators?: any[];
+          transactionCount?: number;
         };
         const bn = data.blockNumber ? BigInt(data.blockNumber) : undefined;
         if (bn && data.commitState) {
@@ -156,7 +178,7 @@ const GraphPage: React.FC = () => {
             blockNumber: bn,
             blockId: data.blockId ?? null,
             commitState: data.commitState ?? null,
-            validators: data.validators,
+            transactionCount: data.transactionCount,
           });
         }
         if (isMounted) setConnectionStatus('connected');

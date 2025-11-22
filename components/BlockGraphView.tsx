@@ -610,6 +610,13 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
                 >
                   {validator.address.slice(0, 6)}...{validator.address.slice(-4)}
                 </div>
+                <div 
+                  className="opacity-70 text-xs truncate w-full leading-tight mt-0.5"
+                  style={{ fontSize: `${Math.max(5, labelFontSize * 0.6)}px` }}
+                  title={`ID: ${validator.id}`}
+                >
+                  {validator.id}
+                </div>
                 </div>
               </div>
             </div>
@@ -623,15 +630,18 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
           className="absolute pointer-events-none z-50 bg-terminal-bg/95 border border-terminal-green/40 rounded-sm p-3 text-sm shadow-lg"
           style={{
             left: Math.min(hoveredNode.x + 10, dimensions.width - 200),
-            top: Math.max(hoveredNode.y - 60, 10),
+            top: Math.max(hoveredNode.y - 80, 10),
             minWidth: '180px',
           }}
         >
           <div className="font-bold text-terminal-green mb-1">
             {hoveredNode.validator.roles.join(' + ')}
           </div>
-          <div className="text-xs text-gray-300">
+          <div className="text-xs text-gray-300 mb-1">
             {hoveredNode.validator.address}
+          </div>
+          <div className="text-xs text-terminal-green/70">
+            Validator ID: {hoveredNode.validator.id}
           </div>
         </div>
       )}
@@ -640,29 +650,6 @@ const BlockGraphView: React.FC<BlockGraphViewProps> = ({
       <div className="absolute bottom-4 left-4 z-10 bg-terminal-bg/80 border border-terminal-green/40 rounded-sm p-2 text-xs text-terminal-green">
         Zoom: {Math.round(transform.scale * 100)}%
       </div>
-
-      {/* Legend */}
-      {/* <div className="absolute bottom-4 left-4 bg-terminal-bg/80 border border-terminal-green/40 rounded-sm p-3 text-xs">
-        <div className="font-bold text-terminal-green mb-2">Validator Roles</div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500/50 border border-blue-400"></div>
-            <span>Proposer</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-orange-500/50 border border-orange-400"></div>
-            <span>Voter</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500/50 border border-red-400"></div>
-            <span>Finalizer</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500/50 border border-emerald-400"></div>
-            <span>Verifier</span>
-          </div>
-        </div>
-      </div> */}
     </div>
   );
 };
