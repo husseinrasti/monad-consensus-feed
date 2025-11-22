@@ -339,7 +339,8 @@ const BlockStatsTable: React.FC<BlockStatsTableProps> = ({ blocks }) => {
   };
 
   const handleClickOpen = (key: string) => {
-    const url = `https://testnet.monadexplorer.com/block/${key}`;
+    const explorerUrl = process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://monadvision.com';
+    const url = `${explorerUrl}/block/${key}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
